@@ -1,7 +1,7 @@
 import socket
 import sys
-import time
 import threading
+import subprocess
 
 host, port = 'localhost',8080
 file_route = 'main'
@@ -18,8 +18,8 @@ def start_server():
     except Exception as e:
         print(e)            # if port is not available
         print("Error: Could not bind to port {port}".format(port=port))
-        sys.exit(1)       # exit from the program
         shutdown()
+        sys.exit(1)       # exit from the program
     connect()
 
 def connect():
@@ -31,6 +31,7 @@ def connect():
         # print("address : " , client_address)
         t = threading.Thread(target = controlling, args=(client_connection,))
         t.start()
+
 
 def controlling(connection):
     while True:
@@ -44,18 +45,32 @@ def controlling(connection):
             break
         print(str_data)
         fileName = str_data.split(' ')[1].split('?')[0]
+        print(fileName)
 
         try:
-
             if (fileName == '/'):
                 fileName = '/index.html'
+            if "." not in fileName:
+                raise IndexError
+
             file_path = file_route + fileName
             file = open(file_path,'rb')    # read bytes
             response_data = file.read()
             file.close()
+            try:
+                if (fileName.split('.')[1] == "php"):
+                    result = subprocess.run(
+                        ['php', file_path],        # program and arguments
+                        stdout=subprocess.PIPE,     # capture stdout
+                        check=True                # raise exception if program fails
+                    )
+                    response_data = result.stdout
+                    print(response_data)
+            except:
+                pass
 
             content_type =''
-            if fileName.endswith('.html'):
+            if fileName.endswith('.html') or fileName.endswith('.php'):
                 content_type += 'Content-Type: text/html\n'
             elif fileName.endswith('.jpg') or fileName.endswith('.jpeg'):
                 content_type += 'Content-Type: image/jpeg\n'
@@ -84,16 +99,15 @@ def controlling(connection):
             header = 'HTTP/1.1 400 Bad Request\n\n'
             response_data = b"<h1>malformed syntax</h1><p>No file type defined!</p>"
 
-
         except FileNotFoundError as e :
             print(e)
             header = 'HTTP/1.1 404 Not Found\n\n'
             fileName = '/404error.html'
             file_path = file_route + fileName
-            print(file_path)
             file = open(file_path,'rb')
             response_data = file.read()
             file.close()
+            print(file_path)
 
 
         response = header.encode()
